@@ -27,14 +27,12 @@ link_directories(
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2")
 
 if(USE_GRAPHICS_MORPHOS)                                                                                                                      
-    include_directories(${OWB_SOURCE_DIR}/Source/WebKit/OrigynWebBrowser/Api/MorphOS ${OWB_SOURCE_DIR}/Base ${OWB_SOURCE_DIR}/Source/JavaScriptCore ${OWB_SOURCE_DIR}/Source/WebCore/page ${OWB_SOURCE_DIR}/cross-build/generated_link/BAL)   
+    include_directories(${OWB_SOURCE_DIR}/Source/WebKit/OrigynWebBrowser/Api/MorphOS ${OWB_SOURCE_DIR}/Base ${OWB_SOURCE_DIR}/Source/JavaScriptCore ${OWB_SOURCE_DIR}/Source/WebCore/page ${OWB_SOURCE_DIR}/Source/WTF ${OWB_SOURCE_DIR}/Source/JavaScriptCore/runtime/ ${OWB_SOURCE_DIR}/Source/WebCore/platform)
     add_executable(owb EXCLUDE_FROM_ALL MorphOS/main.cpp)                                                                                     
 endif(USE_GRAPHICS_MORPHOS)                                                                                                                   
 
 target_link_libraries(owb
-    webkit-owb
-    -L../../lib -L/gg/usr/lib -L/gg/usr/local/lib -lcairo -lpixman-1 -lfontconfig -lfreetype -lxml2 -lexpat -lz -lcurl -ljpeg_shared -lpng_shared -lssl -lcrypto -licui18n -licuuc -licudata -lsqlite3 -lxslt -lavdevice -lavformat -lavcodec -lavutil -lswscale -lbz2 -lz -lc -lc -lm -lstdc++ -ldebug
-#    ${EXTERNAL_DEPS_LIBRARIES}
+    -static -athread=native -L../../lib -Llib webkit-owb webcore jsc wtf -lcairo -lpixman-1 -lfontconfig -lfreetype -lcurl -lrtmp -ljpeg -lpng -lwebp -lsqlite3 -lxslt -lavdevice2 -lavformat2 -lavcodec2 -lavutil2 -lswscale2 -lswresample2 -lxml2 -lexpat -lbz2 -lssl -lcrypto -licui18n -licuuc -licudata -lpthread -ldebug -laos4deps -lauto -lz
 )
 
 # 
