@@ -32,7 +32,7 @@ if(USE_GRAPHICS_MORPHOS)
 endif(USE_GRAPHICS_MORPHOS)                                                                                                                   
 
 target_link_libraries(owb
-    -static -athread=native -L../../lib -Llib webkit-owb webcore jsc wtf -lcairo -lpixman-1 -lfontconfig -lfreetype -lcurl -lrtmp -ljpeg -lpng -lwebp -lsqlite3 -lxslt -lavdevice2 -lavformat2 -lavcodec2 -lavutil2 -lswscale2 -lswresample2 -lxml2 -lexpat -lbz2 -lssl -lcrypto -licui18n -licuuc -licudata -lpthread -ldebug -laos4deps -lauto -lz
+    -static -athread=single -L../../lib -Llib webkit-owb webcore jsc wtf -lcairo -lpixman-1 -lfontconfig -lfreetype -lcurl -lrtmp -ljpeg -lpng -lwebp -lsqlite3 -lxslt -lavdevice2 -lavformat2 -lavcodec2 -lavutil2 -lswscale2 -lswresample2 -lxml2 -lexpat -lbz2 -lssl -lcrypto -licui18n -licuuc -licudata -lpthread -ldebug -laos4deps -lauto -lz
 )
 
 # 
