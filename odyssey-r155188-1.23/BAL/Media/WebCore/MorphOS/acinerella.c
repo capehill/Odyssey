@@ -27,7 +27,7 @@
 #include "libavformat/url.h"		// added from original ffmpeg2.0 to sdk
 #include "libavcodec/avcodec.h"
 #include "libavutil/samplefmt.h"
-#include "libavcodec/audioconvert.h"	// added from original ffmpeg2.0 to sdk
+//#include "libavcodec/audioconvert.h"	// added from original ffmpeg2.0 to sdk
 #include "libavutil/avutil.h"
 #include "libavutil/opt.h"
 #include "libswscale/swscale.h"
@@ -1031,10 +1031,10 @@ void ac_free_video_decoder(lp_ac_video_decoder pDecoder)
 	if(pDecoder)
 	{
 		if(pDecoder->pFrame)
-			av_free(pDecoder->pFrame);
+			av_frame_free(&(pDecoder->pFrame));
 			
 		if(pDecoder->pFrameRGB)
-			av_free(pDecoder->pFrameRGB);    
+			av_frame_free(&(pDecoder->pFrameRGB));
 
 		ObtainSemaphore(&semAcinerella);
 			
@@ -1065,7 +1065,9 @@ void ac_free_audio_decoder(lp_ac_audio_decoder pDecoder)
 
 		if(pDecoder->pCodecCtx && pDecoder->codec_opened)
 			avcodec_close(pDecoder->pCodecCtx);
-		
+
+		av_free(pDecoder->pCodecCtx);
+
 		ReleaseSemaphore(&semAcinerella);
 		
 		mgr_free(pDecoder->pBuffer1);
