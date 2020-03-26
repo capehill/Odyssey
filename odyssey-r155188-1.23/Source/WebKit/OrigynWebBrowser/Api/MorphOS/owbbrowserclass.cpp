@@ -129,7 +129,8 @@ extern "C"
 #include "gui.h"
 #include "utils.h"
 
-#define D(x)
+#define kprintf DebugPrintF
+#define D(x) x
 
 extern CONST_STRPTR * get_user_agent_strings();
 
@@ -304,6 +305,12 @@ struct Data
 	ULONG video_y_offset;
 	ULONG video_colorkey;
 	double video_lastclick;
+
+#if defined(__amigaos4__)
+	struct BitMap *yuv_bitmap_ram;
+	struct BitMap *yuv_bitmap_vram;
+#endif
+
 #endif
 
 #if !defined(__AROS__)
@@ -3805,6 +3812,71 @@ DEFSMETHOD(OWBBrowser_VideoEnterFullPage)
 
 	if(element)
 	{
+#ifdef __amigaos4__
+		// TODO: graphics.library version check (54), HW compositing test, fallbacks...
+		D(kprintf("Creating YUV bitmap\n"););
+
+		IntSize size = element->player()->naturalSize();
+		D(kprintf("naturalsize %dx%d\n", size.width(), size.height()));
+
+		data->video_mode = SRCFMT_YCbCr420;
+		data->yuv_bitmap_ram = AllocBitMapTags(size.width(), size.height(), 32,
+			BMATags_UserPrivate, TRUE,
+			BMATags_PixelFormat, PIXF_YUV420P,
+			TAG_DONE);
+		
+		if (data->yuv_bitmap_ram)
+		{	
+			data->yuv_bitmap_vram = AllocBitMapTags(size.width(), size.height(), 32,
+				BMATags_Displayable, TRUE,
+				BMATags_PixelFormat, PIXF_YUV420P,
+				TAG_DONE);
+
+			if (data->yuv_bitmap_vram)
+			{
+				D(kprintf("Ok\n"));
+
+				data->video_fullscreen = msg->fullscreen;
+				data->video_element    = element;
+
+				// Change backfill behaviour
+				set(obj, MUIA_FillArea,       TRUE);
+				set(obj, MUIA_CustomBackfill, TRUE);
+				DoMethod(obj, MUIM_Backfill, _mleft(obj), _mtop(obj), _mright(obj), _mbottom(obj), 0, 0, 0);
+
+				if(data->video_mode == SRCFMT_YCbCr16)
+				{
+					D(kprintf("Not supported format\n"));
+					element->player()->setOutputPixelFormat(AC_OUTPUT_YUV422); // TODO: 
+				}
+				else if(data->video_mode == SRCFMT_YCbCr420)
+				{
+					D(kprintf("Setting output to YUV420P\n"));
+					element->player()->setOutputPixelFormat(AC_OUTPUT_YUV420P);
+				}
+
+				set(data->hbargroup, MUIA_ShowMe, FALSE);
+				set(data->vbar, MUIA_ShowMe, FALSE);
+
+				Object *mediacontrolsgroup = (Object *) getv(_parent(_parent(obj)), MA_OWBGroup_MediaControlsGroup);
+				if(mediacontrolsgroup)
+				{
+					set(mediacontrolsgroup, MA_MediaControlsGroup_Browser, obj);
+					set(mediacontrolsgroup, MUIA_ShowMe, TRUE);
+				} // TODO else
+			}
+			else
+			{
+				D(kprintf("Failed to allocate YUV VRAM bitmap\n"));
+				FreeBitMap(data->yuv_bitmap_ram);
+				data->yuv_bitmap_ram = NULL;
+			}
+		}
+		else
+		{
+			D(kprintf("Failed to allocate YUV RAM bitmap\n"));
+		}
+#else		
 		if(CGXVideoBase)
 		{
 			struct Window *window = (struct Window *) getv(_win(obj), MUIA_Window);
@@ -3910,9 +3982,11 @@ DEFSMETHOD(OWBBrowser_VideoEnterFullPage)
 				}
 			}	 
 		}
+#endif // __amigaos4__
 	}
 	else
 	{
+		D(kprintf("Back to RGBA32 mode\n"));
 		Object *mediacontrolsgroup = (Object *) getv(_parent(_parent(obj)), MA_OWBGroup_MediaControlsGroup);
 		if(mediacontrolsgroup)
 		{
@@ -3933,6 +4007,21 @@ DEFSMETHOD(OWBBrowser_VideoEnterFullPage)
 		data->video_element    = NULL;
 		data->video_fullscreen = FALSE;
 
+#ifdef __amigaos4__
+		D(kprintf("Freeing YUV bitmaps\n"));
+
+		if (data->yuv_bitmap_ram)
+		{
+			FreeBitMap(data->yuv_bitmap_ram);
+			data->yuv_bitmap_ram = NULL;
+		}
+
+		if (data->yuv_bitmap_vram)
+		{
+			FreeBitMap(data->yuv_bitmap_vram);
+			data->yuv_bitmap_vram = NULL;
+		}
+#else		
 		// Destroy vlayer
 		if (CGXVideoBase)
 		{
@@ -3943,6 +4032,7 @@ DEFSMETHOD(OWBBrowser_VideoEnterFullPage)
 				data->video_handle = NULL;
 			}
 		}
+#endif
 
 		// Redraw the page
 		data->view->webView->addToDirtyRegion(IntRect(0, 0, data->width, data->height));
@@ -3955,12 +4045,211 @@ DEFSMETHOD(OWBBrowser_VideoEnterFullPage)
 	return 0;
 }
 
+#ifdef __amigaos4__
+
+struct CompositeHookData {
+	struct BitMap *srcBitMap;
+	int32 srcWidth, srcHeight;
+	int32 offsetX, offsetY;
+	int32 scaleX, scaleY;
+	uint32 retCode;
+};
+
+static ULONG CompositeHookFunc(struct Hook *hook, struct RastPort *rastPort, struct BackFillMessage *msg)
+{
+	CompositeHookData *hookData = (CompositeHookData *)hook->h_Data;
+
+	D(kprintf("CompositeTags\n"));
+
+	hookData->retCode = CompositeTags(COMPOSITE_Src_Over_Dest, hookData->srcBitMap, rastPort->BitMap,
+		COMPTAG_SrcWidth, hookData->srcWidth,
+		COMPTAG_SrcHeight, hookData->srcHeight,
+		COMPTAG_ScaleX, hookData->scaleX,
+		COMPTAG_ScaleY, hookData->scaleY,
+		COMPTAG_OffsetX, msg->Bounds.MinX - (msg->OffsetX - hookData->offsetX),
+		COMPTAG_OffsetY, msg->Bounds.MinY - (msg->OffsetY - hookData->offsetY),
+		COMPTAG_DestX, msg->Bounds.MinX,
+		COMPTAG_DestY, msg->Bounds.MinY,
+		COMPTAG_DestWidth, msg->Bounds.MaxX - msg->Bounds.MinX + 1,
+		COMPTAG_DestHeight, msg->Bounds.MaxY - msg->Bounds.MinY + 1,
+		COMPTAG_Flags, COMPFLAG_SrcFilter | COMPFLAG_IgnoreDestAlpha | COMPFLAG_HardwareOnly,
+		TAG_END);
+	return 0;
+}	
+#endif
+
 DEFSMETHOD(OWBBrowser_VideoBlit)
 {
 	GETDATA;
 
-	//kprintf("blitoverlay %d %d %d\n", msg->width, msg->height, msg->linesize);
+	D(kprintf("blitoverlay width %d height %d stride %p src %p\n", msg->width, msg->height, msg->stride, msg->src));
 
+#ifdef __amigaos4__
+	if (data->yuv_bitmap_ram && data->yuv_bitmap_vram && msg->src && msg->stride)
+	{
+		int w = msg->width; // TODO: alignment needed or not?
+		int h = msg->height;
+
+		APTR memory = NULL;
+		uint32 bytes_per_row = 0;
+		PlanarYUVInfo yuv_info;
+		yuv_info.YMemory = yuv_info.UMemory = yuv_info.VMemory = NULL;
+		yuv_info.YBytesPerRow = yuv_info.UBytesPerRow = yuv_info.VBytesPerRow = 0;
+		
+		APTR lock = LockBitMapTags(data->yuv_bitmap_ram,
+			LBM_BaseAddress, &memory,
+			LBM_BytesPerRow, &bytes_per_row,
+			LBM_PlanarYUVInfo, &yuv_info,
+			TAG_DONE);
+	
+		if (!lock) {
+			D(kprintf("Failed to lock YUV bitmap\n"));
+			return 0;
+		}
+
+		if (!memory)
+		{
+			D(kprintf("BitMap base address is NULL\n"));
+			UnlockBitMap(lock);
+			return 0;
+		}
+
+		D(kprintf("Locked RAM bitmap\n"));
+
+		switch(data->video_mode)
+		{
+			case SRCFMT_YCbCr420:
+			{
+                                ULONG w2 = w >> 1;
+
+                                //h &= -2;
+                                //w &= -2;
+                                uint8 *sY   = msg->src[0];
+                                uint8 *sCb  = msg->src[1];
+                                uint8 *sCr  = msg->src[2];
+                                uint32 stY  = msg->stride[0];
+                                uint32 stCb = msg->stride[1];
+                                uint32 stCr = msg->stride[2];
+
+				D(kprintf("sY %p, sCb %p, SCr %p\n", sY, sCb, sCr));
+
+                                if(!(sY && sCb && sCr && stY && stCb && stCr))
+				{
+					D(kprintf("Issue with source YUV\n"));
+					break;
+				}
+
+				uint8 *pY = (uint8 *)yuv_info.YMemory;
+				uint8 *pCb = (uint8 *)yuv_info.UMemory;
+				uint8 *pCr = (uint8 *)yuv_info.VMemory;
+
+				uint32 ptY = yuv_info.YBytesPerRow;
+				uint32 ptCb = yuv_info.UBytesPerRow;
+				uint32 ptCr = yuv_info.VBytesPerRow;
+
+				D(kprintf("pY %p, pCb %p, pCr %p. ptY %u, ptCb %u, ptCr %u\n", pY, pCb, pCr, ptY, ptCb, ptCr));
+
+                                if (stY == ptY && w == msg->width)
+                                {
+					do {
+					//D(kprintf("line %d\n", __LINE__));
+                                        CopyMem(sY, pY, ptY * h);
+                                        CopyMem(sCb, pCb, (ptCb * h));
+                                        CopyMem(sCr, pCr, (ptCr * h));
+                                        CopyMem(sCb, pCb, w2);
+                                        CopyMem(sCr, pCr, w2);
+                                        sCb += stCb;
+                                        sCr += stCr;
+
+                                        pCb += ptCb;
+                                        pCr += ptCr;
+
+                                        h -= 2;
+					} while (h > 0);
+                                }
+                                else do
+                                {
+					//D(kprintf("line %d\n", __LINE__));
+					CopyMem(sY, pY, w);
+					pY += ptY;
+                                        sY += stY;
+
+                                        CopyMem(sY, pY, w);
+                                        CopyMem(sCb, pCb, w2);
+                                        CopyMem(sCr, pCr, w2);
+
+                                        sY += stY;
+                                        sCb += stCb;
+                                        sCr += stCr;
+
+                                        pY += ptY;
+                                        pCb += ptCb;
+                                        pCr += ptCr;
+
+                                        h -= 2;
+                                } while (h > 0);
+			}
+			break;
+
+			default: // TODO
+				D(kprintf("Implement other formats\n"));
+				break;
+		}
+
+		UnlockBitMap(lock);
+
+		D(kprintf("Blit RAM->VRAM\n"));
+
+		BltBitMap(data->yuv_bitmap_ram, 0, 0, data->yuv_bitmap_vram, 0, 0, msg->width, msg->height, 0xC0, 0xFF, NULL);
+
+		struct Rectangle rect;
+		struct Hook hook;
+		rect.MinX = _mleft(obj);
+		rect.MinY = _mtop(obj);
+		rect.MaxX = rect.MinX + _mwidth(obj) - 1;
+	        rect.MaxY = rect.MinY + _mheight(obj) - 1;
+
+		float destWidth = _mwidth(obj);
+		float destHeight = _mheight(obj);
+		float scaleX = destWidth / msg->width;
+		float scaleY = destHeight / msg->height;
+		float scale;
+		int32 offsetX, offsetY;
+		
+		offsetX = _mleft(obj);
+		offsetY = _mtop(obj);
+		
+		if (scaleX < scaleY)
+		{
+			scale = scaleX;
+		}
+		else
+		{
+			scale = scaleY;
+		}		
+
+		CompositeHookData hookData;
+		hookData.srcBitMap = data->yuv_bitmap_vram;
+		hookData.srcWidth = msg->width;
+		hookData.srcHeight = msg->height;
+		hookData.offsetX = offsetX;
+		hookData.offsetY = offsetY;
+		hookData.scaleX = COMP_FLOAT_TO_FIX(scale);
+		hookData.scaleY = COMP_FLOAT_TO_FIX(scale);
+		hookData.retCode = COMPERR_Success;
+		rect.MinX = offsetX;
+		rect.MinY = offsetY;
+		rect.MaxX = offsetX + (int32)destWidth - 1; // _mwidth?
+		rect.MaxY = offsetY + (int32)destHeight - 1; // _mheight?
+	
+		hook.h_Entry = (HOOKFUNC)CompositeHookFunc;
+		hook.h_Data = &hookData;
+
+		DoHookClipRects(&hook, _rp(obj), &rect);
+
+		D(kprintf("Composite ret %d\n", hookData.retCode));
+	}
+#else	
 	if(data->video_handle && msg->src && msg->stride && LockVLayer(data->video_handle))
 	{
 		int w = msg->width & -8;
@@ -4061,9 +4350,9 @@ DEFSMETHOD(OWBBrowser_VideoBlit)
 		}
 
 		UnlockVLayer(data->video_handle);
-        SwapVLayerBuffer(data->video_handle);
+		SwapVLayerBuffer(data->video_handle);
 	}
-
+#endif // __amigaos4__
 	return 0;
 }
 
