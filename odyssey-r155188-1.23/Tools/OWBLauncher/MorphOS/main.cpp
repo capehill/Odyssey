@@ -40,7 +40,6 @@
 #include <proto/dos.h>
 #include <proto/application.h>
 
-
 #include <workbench/workbench.h>
 #include <workbench/icon.h>
 #include <proto/icon.h>
@@ -125,12 +124,6 @@ struct KeymapIFace		*IKeymap		= NULL;
 
 struct Library			*MUIMasterBase	= NULL;
 struct MUIMasterIFace	*IMUIMaster		= NULL;
-
-struct Library			*CyberGfxBase	= NULL;
-struct CyberGfxIFace	*ICyberGfx		= NULL;
-
-struct Library			*CGXVideoBase	= NULL;
-struct CgxvideoIFace	*ICgxvideo		= NULL;
 
 struct Library			*CodesetsBase	= NULL;
 struct CodesetsIFace	*ICodesets		= NULL; 
@@ -286,13 +279,6 @@ ULONG open_libs(void)
 				REGAPP_Description, "Odyssey Web Browser",
 				TAG_END);
 	
-	if(!(CyberGfxBase=OpenLibrary("cybergraphics.library",40))) {
-		fprintf(stderr, "Failed to open cybergraphics.library.\n");
-		return FALSE;
-	}
-	ICyberGfx=(struct CyberGfxIFace*)GetInterface(CyberGfxBase,"main",1,NULL);
-		
-		
 	if(!(CodesetsBase = OpenLibrary(CODESETSNAME, CODESETSVER))) {
 		fprintf(stderr, "Failed to open codesets.library.\n");
 		return FALSE;
@@ -358,13 +344,6 @@ void close_libs(void)
 		CloseLibrary(ApplicationBase);
 		ApplicationBase	= NULL;
 	}
-
-	if(CyberGfxBase) {
-		DropInterface((struct Interface*)ICyberGfx);
-		CloseLibrary(CyberGfxBase);
-		CyberGfxBase = NULL;
-	}
-	
 
 	if(CodesetsBase) {		
 		DropInterface((struct Interface*)ICodesets);
