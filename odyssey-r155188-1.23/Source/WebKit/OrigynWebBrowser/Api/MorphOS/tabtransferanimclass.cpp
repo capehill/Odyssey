@@ -263,7 +263,7 @@ DEFMMETHOD(Draw)
 			stride = TABTHROBBER_WIDTH * sizeof(ULONG);
 		}
 
-		WritePixelArray((uint8 *)src, data->imagenum * data->imagewidth, 0, stride, PIXF_A8R8G8B8,_rp(obj), mleft + (mwidth - data->imagewidth) / 2, mtop + (mheight - data->imageheight) / 2, data->imagewidth, data->imageheight /* TODO: data->animate ? 0xffffffff : 0x00000000*/); //data->animate ? 0xffffffff : 0x4fffffff);
+		WritePixelArray((uint8 *)src, data->imagenum * data->imagewidth, 0, stride, PIXF_A8R8G8B8, _rp(obj), mleft + (mwidth - data->imagewidth) / 2, mtop + (mheight - data->imageheight) / 2, data->imagewidth, data->imageheight /* TODO: data->animate ? 0xffffffff : 0x00000000*/); //data->animate ? 0xffffffff : 0x4fffffff);
 	}
 
 	return 0;

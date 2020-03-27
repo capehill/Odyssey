@@ -348,7 +348,7 @@ DEFMMETHOD(Draw)
 
 			if(src)
 			{
-				WritePixelArray((uint8 *) src, 0, 0, stride, PIXF_A8R8G8B8,_rp(obj), mleft, mtop, FAVICON_WIDTH*FACTOR, FAVICON_HEIGHT*FACTOR);
+				WritePixelArray((uint8 *) src, 0, 0, stride, PIXF_A8R8G8B8, _rp(obj), mleft, mtop, FAVICON_WIDTH*FACTOR, FAVICON_HEIGHT*FACTOR);
 			}
 		}
 	}
