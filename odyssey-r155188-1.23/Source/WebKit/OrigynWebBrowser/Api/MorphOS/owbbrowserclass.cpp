@@ -117,10 +117,19 @@ extern "C"
 #include <clib/macros.h>
 #include <mui/Calltips_mcc.h>
 
+
 #include <cybergraphx/cybergraphics.h>
 #include <cybergraphx/cgxvideo.h>
 #include <proto/cybergraphics.h>
 #include <proto/cgxvideo.h>
+
+
+#ifdef __amigaos4__
+#include <graphics/blitattr.h>
+#include <graphics/composite.h>
+#include <proto/layers.h>
+#endif
+
 
 #define min(a,b) ((a)<(b) ? (a) : (b))
 
@@ -239,6 +248,7 @@ struct Data
 	/* draw mode */
 	int draw_mode;
 
+
 #if !USE_MORPHOS_SURFACE
 	/* offscreen bitmap */
 	struct RastPort rp_offscreen;
@@ -305,6 +315,19 @@ struct Data
 	ULONG video_colorkey;
 	double video_lastclick;
 #endif
+#ifdef __amigaos4__
+	int compositing;
+	struct BitMap *srcbm;
+	struct BitMap *dstbm;
+	int16 vleft;
+	int16 vright;
+	int16 vtop;
+	int16 vbottom;
+	int16 vwidth;
+	int16 vheight;
+	struct Rectangle rect;
+#endif
+
 
 #if !defined(__AROS__)
 	/* popup Menu */
@@ -1483,11 +1506,15 @@ DEFMMETHOD(Show)
 
 #if ENABLE(VIDEO)
 		// Video: recompute vlayer offset whenever window size changes
-		if (data->video_element)
+		if(data->video_element)
 		{
 			struct Window *window = (struct Window *) getv(_win(obj), MUIA_Window);
 
+#ifdef __amigaos4__
+			if(window && data->compositing==1)
+#else
 			if(window && data->video_handle)
+#endif
 			{
 				IntSize size = data->video_element->player()->naturalSize();
 				//kprintf("naturalsize %dx%d\n", size.width(), size.height());
@@ -1506,13 +1533,16 @@ DEFMMETHOD(Show)
 					data->video_y_offset /= 2;
 					data->video_x_offset = 0;
 				}
-
+#ifndef __amigaos4__
 				SetVLayerAttrTags(data->video_handle,
 								  VOA_LeftIndent,   _mleft(obj) - window->BorderLeft + data->video_x_offset,
 								  VOA_RightIndent,  window->Width - window->BorderRight - 1 - _mright(obj) + data->video_x_offset,
 								  VOA_TopIndent,    _mtop(obj) - window->BorderTop + data->video_y_offset,
 								  VOA_BottomIndent, window->Height - window->BorderBottom -1 - _mbottom(obj) + data->video_y_offset,
 								  TAG_DONE);
+#endif
+
+
 			}
 		}
 #endif
@@ -3683,6 +3713,72 @@ static inline LONG IsValidRect(const struct Rectangle *rect)
 {
 	return rect->MinX <= rect->MaxX && rect->MinY <= rect->MaxY;
 }
+typedef struct CompositeHookData_s {
+	struct BitMap *srcBitMap; // The source bitmap
+	struct BitMap *dstBitMap;
+	int32 srcWidth, srcHeight; // The source dimensions
+	int32 top;
+	int32 bottom;
+	int32 left;
+	int32 right;
+	uint32 retCode; // The return code from CompositeTags()
+} CompositeHookData;
+
+ULONG compositeHookFunc(struct Hook *hook, struct RastPort *rastPort, struct BackFillMessage *msg)
+{
+	CompositeHookData *hookData = (CompositeHookData*)hook->h_Data;
+	uint16 indexArray[]= { 0,1,2,0,2,3};
+	struct Vert
+	{
+		float32	x,
+				y,
+				s,
+				t,
+				w;
+	}vertices[4];
+
+	//  Vertex 1 top left coordinates: x,y destination bitmap  s,t origin bitmap 
+
+	vertices[0].x = hookData->left;
+	vertices[0].y = hookData->top;
+	vertices[0].s = 0.0f;
+	vertices[0].t = 0.0f;
+	vertices[0].w =  1.0f;		// for perspective correction (3d transformations)
+
+	//  Vertex 2 top right coordinates
+
+	vertices[1].x = hookData->right;
+	vertices[1].y = hookData->top;
+	vertices[1].s =  hookData->srcWidth; // width of the image to blit. for now global		
+	vertices[1].t = 0.0f;
+	vertices[1].w =  1.0f;
+
+	//  Vertex 3 bottom right coordinates
+
+	vertices[2].x = hookData->right;
+	vertices[2].y = hookData->bottom;
+	vertices[2].s =  hookData->srcWidth;
+	vertices[2].t =  hookData->srcHeight;
+	vertices[2].w =  1.0f;
+	
+	//  Vertex 4 bottom left coordinates
+
+	vertices[3].x =  hookData->left;
+	vertices[3].y =  hookData->bottom;
+	vertices[3].s = 0.0f;
+	vertices[3].t =  hookData->srcHeight;
+	vertices[3].w =  1.0f;
+
+	hookData->retCode = CompositeTags(COMPOSITE_Src_Over_Dest,hookData->srcBitMap,rastPort->BitMap,
+					COMPTAG_NumTriangles, 2,
+					COMPTAG_VertexArray, vertices, 
+					COMPTAG_IndexArray, indexArray, 
+					COMPTAG_VertexFormat, COMPVF_STW0_Present,
+					COMPTAG_Flags,COMPFLAG_HardwareOnly | COMPFLAG_SrcFilter,
+					TAG_DONE);
+	return 0;
+}
+
 
 DEFMMETHOD(Backfill)
 {
@@ -3693,13 +3789,23 @@ DEFMMETHOD(Backfill)
 
 //	  kprintf("backfill %d %d %d %d x_offset %d y_offset %d\n", left, top, right, bottom, mygui->x_offset, mygui->y_offset);
 
+
 	/* key rect */
+	/*
 	k.MinX = left + data->video_x_offset;
 	k.MinY = top + data->video_y_offset;
 	k.MaxX = right - data->video_x_offset;
 	k.MaxY = bottom - data->video_y_offset;
 
 	AndRectRect(&k, &bounds);
+*/
+
+
+	data->rect.MinX = left + data->video_x_offset;
+	data->rect.MinY = top + data->video_y_offset;
+	data->rect.MaxX = right - data->video_x_offset;
+	data->rect.MaxY = bottom - data->video_y_offset;
+	AndRectRect(&data->rect, &bounds);
 
 	if (data->video_x_offset || data->video_y_offset)
 	{
@@ -3756,11 +3862,25 @@ DEFMMETHOD(Backfill)
 
 	if (IsValidRect(&k))
 	{
-		FillPixelArray(_rp(obj), k.MinX, k.MinY,
-		               k.MaxX - k.MinX + 1, k.MaxY - k.MinY + 1,
-					   data->video_colorkey);
-	}
 
+#ifndef __amigaos4__
+			FillPixelArray(_rp(obj), k.MinX, k.MinY,
+					k.MaxX - k.MinX + 1, k.MaxY - k.MinY + 1,
+					data->video_colorkey);
+#else					
+					
+			 FillPixelArray(_rp(obj), data->rect.MinX, data->rect.MinY,
+		               data->rect.MaxX - data->rect.MinX + 1, data->rect.MaxY - data->rect.MinY + 1,
+						0x00000000); // we don't need color key for compositing
+						
+			//printf("after FillPixelArray k.MinX = %d, k.MinY = %d, k.MaxY = %d, k.MaxX = %d\n", k.MinX, k.MinY,k.MaxY, k.MaxX);
+
+			data->vleft = k.MinX;
+			data->vright = k.MaxX - k.MinX + 1;
+			data->vtop = k.MinY;
+			data->vbottom = k.MaxY - k.MinY + 1;
+	}
+#endif
 	return (TRUE);
 }
 
@@ -3775,12 +3895,14 @@ DEFSMETHOD(OWBBrowser_VideoEnterFullWindow)
 
 		if(window)
 		{
-			SetVLayerAttrTags(data->video_handle,
+#ifndef __amigaos4__
+		SetVLayerAttrTags(data->video_handle,
 				   VOA_LeftIndent,   window->BorderLeft + data->video_x_offset,
 				   VOA_RightIndent,  window->Width - window->BorderRight - 1 + data->video_x_offset,
 			  	   VOA_TopIndent,    window->BorderTop + data->video_y_offset,
 				   VOA_BottomIndent, window->Height - window->BorderBottom -1 + data->video_y_offset,
 				   TAG_DONE);
+#endif
 		}
 	}
 	else
@@ -3796,6 +3918,11 @@ DEFSMETHOD(OWBBrowser_VideoEnterFullPage)
 {
 	GETDATA;
 
+#ifdef __amigaos4__
+	 data->compositing =1;
+#endif
+
+
 	Element *e = (Element *) msg->element;
 	HTMLMediaElement *element = (HTMLMediaElement *) msg->element;
 
@@ -3805,7 +3932,11 @@ DEFSMETHOD(OWBBrowser_VideoEnterFullPage)
 
 	if(element)
 	{
+#ifdef __amigaos4__
+		if(data->compositing == 1)
+#else
 		if(CGXVideoBase)
+#endif
 		{
 			struct Window *window = (struct Window *) getv(_win(obj), MUIA_Window);
 
@@ -3818,7 +3949,17 @@ DEFSMETHOD(OWBBrowser_VideoEnterFullPage)
 				ULONG vlayer_height = size.height() & -2;
 
 				data->video_mode = SRCFMT_YCbCr420;
+#ifdef __amigaos4__
+				data->srcbm = AllocBitMapTags(vlayer_width,vlayer_height,32,
+						BMATags_UserPrivate, TRUE,
+						BMATags_PixelFormat,PIXF_YUV420P,
+						TAG_DONE);
+				data->dstbm = AllocBitMapTags(vlayer_width,vlayer_height,32,
+						BMATags_Displayable, TRUE,
+						BMATags_PixelFormat,PIXF_YUV420P,
+						TAG_DONE);
 
+#else
 				data->video_handle = CreateVLayerHandleTags(window->WScreen,
 										VOA_SrcType,      data->video_mode,
 										VOA_UseColorKey,  TRUE,
@@ -3827,7 +3968,25 @@ DEFSMETHOD(OWBBrowser_VideoEnterFullPage)
 										VOA_SrcHeight,    vlayer_height,
 										VOA_DoubleBuffer, TRUE,
 									    TAG_DONE);
+#endif
 
+#ifdef __amigaos4__
+				if(!data->srcbm)
+				{
+					DoMethod(app, MM_OWBApp_AddConsoleMessage, "[MediaPlayer] Couldn't create planar overlay layer, trying chunky instead");
+
+					data->video_mode = SRCFMT_YCbCr16;
+					data->srcbm = AllocBitMapTags(vlayer_width,vlayer_height,32,
+						BMATags_Displayable, TRUE,
+						BMATags_PixelFormat,PIXF_YUV422,
+						TAG_DONE);
+					data->dstbm = AllocBitMapTags(vlayer_width,vlayer_height,32,
+						BMATags_Displayable, TRUE,
+						BMATags_PixelFormat,PIXF_YUV422,
+						TAG_DONE);
+
+				}
+#else
 				if(!data->video_handle)
 				{
 					DoMethod(app, MM_OWBApp_AddConsoleMessage, "[MediaPlayer] Couldn't create planar overlay layer, trying chunky instead");
@@ -3843,8 +4002,12 @@ DEFSMETHOD(OWBBrowser_VideoEnterFullPage)
 											VOA_DoubleBuffer, TRUE,
 										    TAG_DONE);
 				}
-
+#endif
+#ifdef __amigaos4__
+				if(data->srcbm)
+#else
 				if(data->video_handle)
+#endif
 				{
 					if ( ( (float) size.width() / (float) size.height()) < ( (float) _mwidth(obj) / (float) _mheight(obj)) )
 					{
@@ -3860,17 +4023,22 @@ DEFSMETHOD(OWBBrowser_VideoEnterFullPage)
 						data->video_y_offset /= 2;
 						data->video_x_offset = 0;
 					}
-
+#ifdef __amigaos4__
+					if(data->compositing == 1)
+#else
 					if(0 == AttachVLayerTags(data->video_handle, window,
 											  VOA_LeftIndent,   _mleft(obj) - window->BorderLeft + data->video_x_offset,
 											  VOA_RightIndent,  window->Width - window->BorderRight - 1 - _mright(obj) + data->video_x_offset,
 										 	  VOA_TopIndent,    _mtop(obj) - window->BorderTop + data->video_y_offset,
 									    	  VOA_BottomIndent, window->Height - window->BorderBottom -1 - _mbottom(obj) + data->video_y_offset,
 								              TAG_DONE))
+#endif
 					{
 						data->video_fullscreen = msg->fullscreen;
 						data->video_element    = element;
+#ifndef __amigaos4__
 						data->video_colorkey   = GetVLayerAttr(data->video_handle, VOA_ColorKey);
+#endif
 
 						enable_blanker(_screen(obj), FALSE);
 
@@ -3900,8 +4068,21 @@ DEFSMETHOD(OWBBrowser_VideoEnterFullPage)
 					}
 					else
 					{
+#ifdef __amigaos4__
+						if(data->srcbm)
+						{
+							FreeBitMap(data->srcbm);
+							data->srcbm = NULL;
+						}
+						if(data->dstbm)
+						{
+							FreeBitMap(data->dstbm);
+							data->dstbm = NULL;
+						}
+#else
 						DeleteVLayerHandle(data->video_handle);
 						data->video_handle = NULL;
+#endif
 					}			 
 				}
 				else
@@ -3934,14 +4115,46 @@ DEFSMETHOD(OWBBrowser_VideoEnterFullPage)
 		data->video_fullscreen = FALSE;
 
 		// Destroy vlayer
+#ifdef __amigaos4__
+						if(data->srcbm)
+						{
+							 FreeBitMap(data->srcbm);
+							data->srcbm = NULL;
+						}
+						if(data->dstbm)
+						{
+							FreeBitMap(data->dstbm);
+							data->dstbm = NULL;
+						}
+#else
+						DeleteVLayerHandle(data->video_handle);
+						data->video_handle = NULL;
+#endif
+#ifdef __amigaos4__
+		if(data->compositing ==1)
+#else
 		if (CGXVideoBase)
+#endif
 		{
+#ifdef __amigaos4__
+			if(data->srcbm)
+			{
+				FreeBitMap(data->srcbm);
+				data->srcbm = NULL;
+			}
+			if(data->dstbm)
+			{
+				FreeBitMap(data->dstbm);
+				data->dstbm = NULL;
+			}
+#else
 			if (data->video_handle)
 			{
 				DetachVLayer(data->video_handle);
 				DeleteVLayerHandle(data->video_handle);
 				data->video_handle = NULL;
 			}
+#endif
 		}
 
 		// Redraw the page
@@ -3955,7 +4168,162 @@ DEFSMETHOD(OWBBrowser_VideoEnterFullPage)
 	return 0;
 }
 
+
 DEFSMETHOD(OWBBrowser_VideoBlit)
+#ifdef __amigaos4__
+{
+	GETDATA;
+
+	struct Window *window = (struct Window *) getv(_win(obj), MUIA_Window);
+	APTR memory;
+	uint32 bytesPerRow;
+	struct PlanarYUVInfo yuvInfo;
+
+	APTR lock = LockBitMapTags(data->srcbm,
+		LBM_BaseAddress, &memory,
+		LBM_BytesPerRow, &bytesPerRow,
+		LBM_PlanarYUVInfo, &yuvInfo,
+		TAG_END);
+
+	//kprintf("blitoverlay %d %d %d\n", msg->width, msg->height, msg->linesize);
+
+	if(msg->src && msg->stride && lock !=NULL)
+	{
+		int w = msg->width & -8;
+		int h = msg->height & -2;
+		int x = 0;
+		int y = 0;
+
+ 		data->vwidth = w;
+		data->vheight = h;
+
+		switch(data->video_mode)
+		{
+			case SRCFMT_YCbCr16:	// YUV422
+			{
+				UBYTE *dYUV;
+				UBYTE *sYUV;
+				ULONG dtYUV, stYUV;
+
+				sYUV = msg->src[0];
+				stYUV = msg->stride[0];
+
+				if(!sYUV || !stYUV)
+					break;
+
+			//	dtYUV = GetVLayerAttr(data->video_handle, VOA_Modulo);		/// LINEA?
+			//	dYUV = (UBYTE *)GetVLayerAttr(data->video_handle, VOA_BaseAddress); // ORIGEN
+			//	dYUV += (y * dtYUV) + x;	// PRIMER PIXEL
+
+				if (stYUV == dtYUV && w == msg->width)
+				{
+					CopyMem(sYUV, dYUV, dtYUV * h);
+				}
+				else do
+				{
+					CopyMem(sYUV, dYUV, w);
+					dYUV += dtYUV;
+					sYUV += stYUV;
+				} while (--h > 0);
+			
+				break;
+			}
+
+			case SRCFMT_YCbCr420:	//YUV420P
+			{
+				APTR pY, pCb, pCr;
+				UBYTE *sY, *sCb, *sCr;
+				ULONG ptY, stY, ptCb, stCb, ptCr, stCr;
+				ULONG w2 = w >> 1;
+
+				h &= -2;
+				w &= -2;
+				sY   = msg->src[0];
+				sCb  = msg->src[1];
+				sCr  = msg->src[2];
+				stY  = msg->stride[0];
+				stCb = msg->stride[1];
+				stCr = msg->stride[2];
+
+				if(!(sY && sCb && sCr && stY && stCb && stCr))
+					break;
+
+				ptY  = yuvInfo.YBytesPerRow;			// GetVLayerAttr(data->video_handle, VOA_Modulo) >> 1;
+				ptCr = yuvInfo.UBytesPerRow;			// ptCb = ptY >> 1;
+				ptCb = yuvInfo.VBytesPerRow;
+			
+			/*	pY = (UBYTE *)GetVLayerAttr(data->video_handle, VOA_BaseAddress);
+				pCb = pY + (ptY * msg->height);
+				pCr = pCb + ((ptCb * msg->height) >> 1); */
+
+				pY  = yuvInfo.YMemory;				// += (y * ptY) + x;
+				pCb = yuvInfo.UMemory;				// += ((y * ptCb) >> 1) + (x >> 1);
+				pCr = yuvInfo.VMemory;				// += ((y * ptCr) >> 1) + (x >> 1);
+
+				if (stY == ptY && w == msg->width)
+				{
+					CopyMem(sY, pY, ptY * h);
+					CopyMem(sCb, pCb, (ptCb * h) >> 1);
+					CopyMem(sCr, pCr, (ptCr * h) >> 1);
+				}
+				else do
+				{
+					CopyMem(sY, pY, w);
+
+					pY += ptY;
+					sY += stY;
+
+					CopyMem(sY, pY, w);
+					CopyMem(sCb, pCb, w2);
+					CopyMem(sCr, pCr, w2);
+
+					sY += stY;
+					sCb += stCb;
+					sCr += stCr;
+
+					pY += ptY;
+					pCb += ptCb;
+					pCr += ptCr;
+
+					h -= 2;
+				} while (h > 0);
+
+				break;
+			}
+		}
+		UnlockBitMap(lock);
+		BltBitMap(data->srcbm, 0, 0, data->dstbm, 0, 0, msg->width, msg->height, 0xC0, 0xFF, NULL);
+		WaitTOF();
+		struct Hook hook;
+		struct Rectangle rect;
+		CompositeHookData hookData;
+
+		rect.MinX = data->vleft;
+		rect.MinY = data->vtop;
+		rect.MaxX = data->vright;
+		rect.MaxY = data->vbottom;
+
+		hookData.srcBitMap = data->dstbm;
+		hookData.srcWidth = msg->width;
+		hookData.srcHeight = msg->height;
+		hookData.left = data->rect.MinX;
+		hookData.top = data->rect.MinY;
+		hookData.right = data->rect.MaxX + 1;
+		hookData.bottom = data->rect.MaxY + 1;
+		hookData.retCode = COMPERR_Success;
+
+		hook.h_Entry = (HOOKFUNC)compositeHookFunc;
+		hook.h_Data = &hookData;
+
+		//printf("before DoHookClipRects  : data->vleft = %d, data->vright = %d,  data->vtop = %d, data->vbottom = %d\n", data->vleft, data->vright, data->vtop, data->vbottom);
+		DoHookClipRects(&hook, window->RPort, &data->rect);
+
+		return hookData.retCode;
+	}
+
+	return 0;
+}
+#else
 {
 	GETDATA;
 
@@ -3982,9 +4350,9 @@ DEFSMETHOD(OWBBrowser_VideoBlit)
 				if(!sYUV || !stYUV)
 					break;
 
-				dtYUV = GetVLayerAttr(data->video_handle, VOA_Modulo);
-				dYUV = (UBYTE *)GetVLayerAttr(data->video_handle, VOA_BaseAddress);
-				dYUV += (y * dtYUV) + x;
+				dtYUV = GetVLayerAttr(data->video_handle, VOA_Modulo);		/// LINEA?
+				dYUV = (UBYTE *)GetVLayerAttr(data->video_handle, VOA_BaseAddress); // ORIGEN
+				dYUV += (y * dtYUV) + x;	// PRIMER PIXEL
 
 				if (stYUV == dtYUV && w == msg->width)
 				{
@@ -4066,7 +4434,7 @@ DEFSMETHOD(OWBBrowser_VideoBlit)
 
 	return 0;
 }
-
+#endif
 #endif
 
 /*****************************************************************************/
@@ -4403,4 +4771,3 @@ DECSMETHOD(Plugin_Message)
 ENDMTABLE
 
 DECSUBCLASS_NC(MUIC_Area, owbbrowserclass)
-
