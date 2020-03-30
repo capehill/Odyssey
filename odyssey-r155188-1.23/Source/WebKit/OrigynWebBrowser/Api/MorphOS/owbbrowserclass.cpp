@@ -306,7 +306,6 @@ struct Data
 
 #if ENABLE(VIDEO)
 	/* media  */
-	//VLayerHandle     *video_handle;
 	HTMLMediaElement *video_element; // XXX: we can have several media instances per browser but this one is the vlayer video element (there can be only one at once).
 	ULONG video_fullscreen;
 	ULONG video_mode;
@@ -3799,7 +3798,6 @@ DEFMMETHOD(Backfill)
 	AndRectRect(&k, &bounds);
 */
 
-
 	data->rect.MinX = left + data->video_x_offset;
 	data->rect.MinY = top + data->video_y_offset;
 	data->rect.MaxX = right - data->video_x_offset;
@@ -3867,7 +3865,7 @@ DEFMMETHOD(Backfill)
 					data->video_colorkey);
 #else					
 					
-			FillPixelArray(_rp(obj), data->rect.MinX, data->rect.MinY,
+			RectFillColor(_rp(obj), data->rect.MinX, data->rect.MinY,
 		               data->rect.MaxX - data->rect.MinX + 1, data->rect.MaxY - data->rect.MinY + 1,
 						0x00000000); // we don't need color key for compositing
 						
@@ -3915,15 +3913,15 @@ DEFSMETHOD(OWBBrowser_VideoEnterFullPage)
 				ULONG vlayer_width  = size.width() & -8;
 				ULONG vlayer_height = size.height() & -2;
 
-				data->video_mode = SRCFMT_YCbCr420;
+				data->video_mode = PIXF_YUV420P;
 #ifdef __amigaos4__
 				data->srcbm = AllocBitMapTags(vlayer_width,vlayer_height,32,
 						BMATags_UserPrivate, TRUE,
-						BMATags_PixelFormat,PIXF_YUV420P,
+						BMATags_PixelFormat, PIXF_YUV420P,
 						TAG_DONE);
 				data->dstbm = AllocBitMapTags(vlayer_width,vlayer_height,32,
 						BMATags_Displayable, TRUE,
-						BMATags_PixelFormat,PIXF_YUV420P,
+						BMATags_PixelFormat, PIXF_YUV420P,
 						TAG_DONE);
 
 #else
@@ -3942,14 +3940,14 @@ DEFSMETHOD(OWBBrowser_VideoEnterFullPage)
 				{
 					DoMethod(app, MM_OWBApp_AddConsoleMessage, "[MediaPlayer] Couldn't create planar overlay layer, trying chunky instead");
 
-					data->video_mode = SRCFMT_YCbCr16;
+					data->video_mode = PIXF_YUV422;
 					data->srcbm = AllocBitMapTags(vlayer_width,vlayer_height,32,
 						BMATags_Displayable, TRUE,
-						BMATags_PixelFormat,PIXF_YUV422,
+						BMATags_PixelFormat, PIXF_YUV422,
 						TAG_DONE);
 					data->dstbm = AllocBitMapTags(vlayer_width,vlayer_height,32,
 						BMATags_Displayable, TRUE,
-						BMATags_PixelFormat,PIXF_YUV422,
+						BMATags_PixelFormat, PIXF_YUV422,
 						TAG_DONE);
 				}
 #else
@@ -4013,11 +4011,11 @@ DEFSMETHOD(OWBBrowser_VideoEnterFullPage)
 						set(obj, MUIA_CustomBackfill, TRUE);
 						DoMethod(obj, MUIM_Backfill, _mleft(obj), _mtop(obj), _mright(obj), _mbottom(obj), 0, 0, 0);
 
-						if(data->video_mode == SRCFMT_YCbCr16)
+						if(data->video_mode == PIXF_YUV422)
 						{
 							element->player()->setOutputPixelFormat(AC_OUTPUT_YUV422);
 						}
-						else if(data->video_mode == SRCFMT_YCbCr420)
+						else if(data->video_mode == PIXF_YUV420P)
 						{                            
 							element->player()->setOutputPixelFormat(AC_OUTPUT_YUV420P);
 						}
@@ -4055,8 +4053,9 @@ DEFSMETHOD(OWBBrowser_VideoEnterFullPage)
 				{
 					DoMethod(app, MM_OWBApp_AddConsoleMessage, "[MediaPlayer] Couldn't create overlay layer");
 				}
-			}	 
+			}
 		}
+#endif
 	}
 	else
 	{
@@ -4080,6 +4079,7 @@ DEFSMETHOD(OWBBrowser_VideoEnterFullPage)
 		data->video_element    = NULL;
 		data->video_fullscreen = FALSE;
 
+#ifndef __amigaos4__
 		// Destroy vlayer
 #ifdef __amigaos4__
 		if(data->srcbm)
@@ -4150,21 +4150,21 @@ DEFSMETHOD(OWBBrowser_VideoBlit)
 		LBM_PlanarYUVInfo, &yuvInfo,
 		TAG_END);
 
-	//kprintf("blitoverlay %d %d %d\n", msg->width, msg->height, msg->linesize);
+	//D(bug("blitoverlay %d %d %d\n", msg->width, msg->height, msg->linesize));
 
-	if(msg->src && msg->stride && lock !=NULL)
+	if(msg->src && msg->stride && lock != NULL)
 	{
 		int w = msg->width & -8;
 		int h = msg->height & -2;
-		int x = 0;
-		int y = 0;
+		//int x = 0;
+		//int y = 0;
 
  		data->vwidth = w;
 		data->vheight = h;
 
 		switch(data->video_mode)
 		{
-			case SRCFMT_YCbCr16:	// YUV422
+			case PIXF_YUV422:
 			{
 				UBYTE *dYUV;
 				UBYTE *sYUV;
@@ -4176,9 +4176,9 @@ DEFSMETHOD(OWBBrowser_VideoBlit)
 				if(!sYUV || !stYUV)
 					break;
 
-			//	dtYUV = GetVLayerAttr(data->video_handle, VOA_Modulo);		/// LINEA?
-			//	dYUV = (UBYTE *)GetVLayerAttr(data->video_handle, VOA_BaseAddress); // ORIGEN
-			//	dYUV += (y * dtYUV) + x;	// PRIMER PIXEL
+				//	dtYUV = GetVLayerAttr(data->video_handle, VOA_Modulo);		/// LINEA?
+				//	dYUV = (UBYTE *)GetVLayerAttr(data->video_handle, VOA_BaseAddress); // ORIGEN
+				//	dYUV += (y * dtYUV) + x;	// PRIMER PIXEL
 
 				if (stYUV == dtYUV && w == msg->width)
 				{
@@ -4194,9 +4194,8 @@ DEFSMETHOD(OWBBrowser_VideoBlit)
 				break;
 			}
 
-			case SRCFMT_YCbCr420:	//YUV420P
+			case PIXF_YUV420P:
 			{
-				APTR pY, pCb, pCr;
 				UBYTE *sY, *sCb, *sCr;
 				ULONG ptY, stY, ptCb, stCb, ptCr, stCr;
 				ULONG w2 = w >> 1;
@@ -4221,9 +4220,9 @@ DEFSMETHOD(OWBBrowser_VideoBlit)
 				pCb = pY + (ptY * msg->height);
 				pCr = pCb + ((ptCb * msg->height) >> 1); */
 
-				pY  = yuvInfo.YMemory;				// += (y * ptY) + x;
-				pCb = yuvInfo.UMemory;				// += ((y * ptCb) >> 1) + (x >> 1);
-				pCr = yuvInfo.VMemory;				// += ((y * ptCr) >> 1) + (x >> 1);
+				uint8* pY  = (uint8 *)yuvInfo.YMemory;				// += (y * ptY) + x;
+				uint8* pCb = (uint8 *)yuvInfo.UMemory;				// += ((y * ptCb) >> 1) + (x >> 1);
+				uint8* pCr = (uint8 *)yuvInfo.VMemory;				// += ((y * ptCr) >> 1) + (x >> 1);
 
 				if (stY == ptY && w == msg->width)
 				{
@@ -4260,13 +4259,13 @@ DEFSMETHOD(OWBBrowser_VideoBlit)
 		BltBitMap(data->srcbm, 0, 0, data->dstbm, 0, 0, msg->width, msg->height, 0xC0, 0xFF, NULL);
 		WaitTOF();
 		struct Hook hook;
-		struct Rectangle rect;
+		//struct Rectangle rect;
 		CompositeHookData hookData;
 
-		rect.MinX = data->vleft;
-		rect.MinY = data->vtop;
-		rect.MaxX = data->vright;
-		rect.MaxY = data->vbottom;
+		//rect.MinX = data->vleft;
+		//rect.MinY = data->vtop;
+		//rect.MaxX = data->vright;
+		//rect.MaxY = data->vbottom;
 
 		hookData.srcBitMap = data->dstbm;
 		hookData.srcWidth = msg->width;
@@ -4293,7 +4292,6 @@ DEFSMETHOD(OWBBrowser_VideoBlit)
 	GETDATA;
 
 	//D(bug("blitoverlay %d %d %d\n", msg->width, msg->height, msg->linesize));
-#ifndef __amigaos4__
 	if(data->video_handle && msg->src && msg->stride && LockVLayer(data->video_handle))
 	{
 		int w = msg->width & -8;
@@ -4396,10 +4394,9 @@ DEFSMETHOD(OWBBrowser_VideoBlit)
 		UnlockVLayer(data->video_handle);
 		SwapVLayerBuffer(data->video_handle);
 	}
-#endif
+
 	return 0;
 }
-#endif
 #endif
 
 /*****************************************************************************/

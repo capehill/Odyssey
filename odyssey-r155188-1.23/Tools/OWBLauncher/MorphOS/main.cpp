@@ -40,7 +40,6 @@
 #include <proto/dos.h>
 #include <proto/application.h>
 
-
 #include <workbench/workbench.h>
 #include <workbench/icon.h>
 #include <proto/icon.h>
