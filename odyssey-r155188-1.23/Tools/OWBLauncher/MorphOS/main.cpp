@@ -52,14 +52,10 @@
 #include <locale.h>
 #include <setjmp.h>
 
-#include <clib/debug_protos.h>
-
 #include "gui.h"
 #include "../../../Source/WebKit/OrigynWebBrowser/Api/MorphOS/alocale.h"
 
 #undef accept
-
-#define D(x)
 
 #include <proto/intuition.h>
 #include <proto/codesets.h>
@@ -70,11 +66,16 @@
 #include <reaction/reaction_macros.h>
 #include <diskfont/diskfonttag.h>
 
+/* Debug output to serial handled via D(bug("....."));
+*  See Base/debug.h for details.
+*  D(x)    - to disable debug
+*  D(x) x  - to enable debug
+*/
+#define D(x)
 
 void close_dictionary();
 void destroy_application(void);
 void close_libs(void);
-
 
 static uint32* unicode_map;
 //uint32 clearClipboard = FALSE;
@@ -87,12 +88,11 @@ uint32 amigaToUnicodeChar(uint32 c)
 	return c;
 }
 
-
 extern "C"
 {
 	int raise(int sig)
 	{
-		kprintf("raise(%d) was called, dumping stackframe...\n", sig);
+		D(bug("raise(%d) was called, dumping stackframe...\n", sig));
 		#ifndef __amigaos4__
 		DumpTaskState(FindTask(NULL));
 		#endif
@@ -102,7 +102,7 @@ extern "C"
 	/*
 	void abort(void)
 	{
-		kprintf("abort was called, dumping stackframe...\n");
+		D(bug("abort was called, dumping stackframe...\n"));
 
 		DumpTaskState(FindTask(NULL));
 
@@ -125,12 +125,6 @@ struct KeymapIFace		*IKeymap		= NULL;
 
 struct Library			*MUIMasterBase	= NULL;
 struct MUIMasterIFace	*IMUIMaster		= NULL;
-
-struct Library			*CyberGfxBase	= NULL;
-struct CyberGfxIFace	*ICyberGfx		= NULL;
-
-struct Library			*CGXVideoBase	= NULL;
-struct CgxvideoIFace	*ICgxvideo		= NULL;
 
 struct Library			*CodesetsBase	= NULL;
 struct CodesetsIFace	*ICodesets		= NULL; 
@@ -255,7 +249,7 @@ ULONG open_libs(void)
 	else
 	{
 		// no MUI at all
-			
+
 		requester_object = NewObject(NULL, "requester.class",
 				REQ_Type,  REQTYPE_INFO,
 				REQ_Image, REQIMAGE_ERROR,
@@ -272,27 +266,20 @@ ULONG open_libs(void)
 				  
 		return FALSE;
 	}
-	
+
 	// application.library (to register app, to enable/disable blankers, etc).
 	if (!(ApplicationBase = OpenLibrary("application.library", 52))) {	
 		fprintf(stderr,"Failed to open application.library\n");
 		return FALSE;
 	}	 
 	IApplication  = (struct ApplicationIFace *)GetInterface(ApplicationBase, "application", 2, NULL);
-	
+
 	// register an app for aplication library	
 	appID = RegisterApplication("Odyssey",
 				REGAPP_URLIdentifier, "none",
 				REGAPP_Description, "Odyssey Web Browser",
 				TAG_END);
-	
-	if(!(CyberGfxBase=OpenLibrary("cybergraphics.library",40))) {
-		fprintf(stderr, "Failed to open cybergraphics.library.\n");
-		return FALSE;
-	}
-	ICyberGfx=(struct CyberGfxIFace*)GetInterface(CyberGfxBase,"main",1,NULL);
-		
-		
+
 	if(!(CodesetsBase = OpenLibrary(CODESETSNAME, CODESETSVER))) {
 		fprintf(stderr, "Failed to open codesets.library.\n");
 		return FALSE;
@@ -304,7 +291,7 @@ ULONG open_libs(void)
 		return FALSE;
 	}
 	IDiskFont = (struct DiskFontIFace *)GetInterface(DiskFontBase, "main", 1, NULL); 
-		
+
 	if(!(IconBase = OpenLibrary("icon.library", 39))) {
 		fprintf(stderr, "Failed to open icon.library.\n");
 		return FALSE;
@@ -321,10 +308,8 @@ ULONG open_libs(void)
 	
 	if(OpenURLBase = OpenLibrary("openurl.library", 0)) {
 		IOpenURL = (struct OpenURLIFace *)GetInterface(OpenURLBase, "main", 1, NULL); 
-	}	
-			
-	
-	
+	}
+
 	extern void init_useragent();
 	init_useragent();
 
@@ -350,8 +335,7 @@ void close_libs(void)
 		CloseLibrary(MUIMasterBase);
 		MUIMasterBase = NULL;
 	}
-		
-	
+
 	if (ApplicationBase) {
 		UnregisterApplication(appID, NULL);
 		DropInterface((struct Interface*)IApplication);
@@ -359,19 +343,12 @@ void close_libs(void)
 		ApplicationBase	= NULL;
 	}
 
-	if(CyberGfxBase) {
-		DropInterface((struct Interface*)ICyberGfx);
-		CloseLibrary(CyberGfxBase);
-		CyberGfxBase = NULL;
-	}
-	
-
-	if(CodesetsBase) {		
+	if(CodesetsBase) {
 		DropInterface((struct Interface*)ICodesets);
 		CloseLibrary(CodesetsBase);
 		CodesetsBase = NULL;
 	}
-	
+
 	if(DiskFontBase) {
 		DropInterface((struct Interface*)IDiskFont);
 		CloseLibrary(DiskFontBase);
@@ -383,7 +360,7 @@ void close_libs(void)
 		CloseLibrary(IconBase);
 		IconBase = NULL;
 	}
-	
+
 	if(ExpatBase) {
 		DropInterface((struct Interface*)IExpat);
 		CloseLibrary(ExpatBase);
@@ -395,7 +372,6 @@ void close_libs(void)
 		CloseLibrary(OpenURLBase);
 		OpenURLBase = NULL;
 	}
-	
 }
 
 void destroy_application(void)
@@ -430,10 +406,10 @@ Object *create_application(char *url)
 	locale_init();
 
 	unicode_map = (uint32*)ObtainCharsetInfo(DFCS_NUMBER, locale->loc_CodeSet, DFCS_MAPTABLE); 
-	
+
 	if(classes_init())
 	{
-	    methodstack_init();
+		methodstack_init();
 		obj = (Object *) NewObject(getowbappclass(), NULL, MA_OWBBrowser_URL, (ULONG) url, TAG_DONE);
 	}
 	else
@@ -453,23 +429,23 @@ void main_loop(void)
 	ULONG signals;
 
 	setIsSafeToQuit(TRUE);
-	
+
 	if(setjmp(bailout_env) == -1)
 	{
-	    running = FALSE;
+		running = FALSE;
 	}
-	
+
 	while (running)
 	{
 		ULONG ret = DoMethod(app,MUIM_Application_NewInput,&signals);
-	
+
 /*
 		if (clearClipboard)
-		{			
+		{
 			clearClipboard = FALSE;
 			#warning To fix by adding right includes 
 			//Pasteboard::createForGlobalSelection()->clear(); 
-		}		
+		}
 */
 		switch(ret)
 		{
@@ -495,17 +471,17 @@ void main_loop(void)
 			if(isSafeToQuit())
 				running = FALSE;
 		}
-		
+
 		if(signals & SIGBREAKF_CTRL_E)
 		{
 			/* Run webkit events for each active browser */
 			DoMethod(app, MM_OWBApp_WebKitEvents);
 		}
-		
+
 		/*
 		if(signals & dosnotifysig )
 		{
-			//kprintf("DosNotify Trig\n");
+			//D(bug("DosNotify Trig\n"));
 			//DoMethod(getv(app, MA_OWBApp_BookmarkGroup), MM_Bookmarkgroup_DosNotify);
 		}
 		*/
@@ -523,7 +499,7 @@ int main (int argc, char* argv[])
 	APTR olduserdata = CurrentTask->tc_UserData;
 	CurrentTask->tc_UserData = NULL;
 	#endif
-	
+
 	signal(SIGINT, SIG_IGN);
 	atexit(close_libs);
 	atexit(destroy_application);
@@ -546,7 +522,7 @@ int main (int argc, char* argv[])
 			app = create_application(argc > 1 ? (char*)argv[1] : (char *)"");
 
 			if(app)
-			{				
+			{
 				main_loop();
 			}
 
@@ -554,13 +530,13 @@ int main (int argc, char* argv[])
 		}
 	}
 	close_libs();
-	
+
 	//dosnotify_cleanup();
-	
+
 	#ifdef __amigaos4__
 	// restore tc_UserData at exit
 	CurrentTask->tc_UserData = olduserdata;
 	#endif
-	
+
 	return 0;
 }

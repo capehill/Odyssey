@@ -99,7 +99,7 @@
 extern "C"
 {
 	#include "../../../../BAL/Media/WebCore/MorphOS/acinerella.h"
-	extern struct Library *CGXVideoBase;
+	//extern struct Library *CGXVideoBase;
 }
 #endif
 
@@ -117,19 +117,15 @@ extern "C"
 #include <clib/macros.h>
 #include <mui/Calltips_mcc.h>
 
-
-#include <cybergraphx/cybergraphics.h>
-#include <cybergraphx/cgxvideo.h>
-#include <proto/cybergraphics.h>
-#include <proto/cgxvideo.h>
-
+//#include <cybergraphx/cybergraphics.h>
+//#include <cybergraphx/cgxvideo.h>
+//#include <proto/cybergraphics.h>
+//#include <proto/cgxvideo.h>
 
 #ifdef __amigaos4__
 #include <graphics/blitattr.h>
 #include <graphics/composite.h>
-#include <proto/layers.h>
 #endif
-
 
 #define min(a,b) ((a)<(b) ? (a) : (b))
 
@@ -138,6 +134,11 @@ extern "C"
 #include "gui.h"
 #include "utils.h"
 
+/* Debug output to serial handled via D(bug("....."));
+*  See Base/debug.h for details.
+*  D(x)    - to disable debug
+*  D(x) x  - to enable debug
+*/
 #define D(x)
 
 extern CONST_STRPTR * get_user_agent_strings();
@@ -160,7 +161,6 @@ static __inline IPTR _CALLFUNC2(IPTR (*func)(IPTR,IPTR), IPTR arg1, IPTR arg2) {
 #define CALLFUNC2(f,a1,a2) _CALLFUNC2((IPTR (*)(IPTR,IPTR))(f),(IPTR)(a1),(IPTR)(a2))
 
 #else
-
 
 #include <emul/emulinterface.h>
 #include <emul/emulregs.h>
@@ -306,7 +306,7 @@ struct Data
 
 #if ENABLE(VIDEO)
 	/* media  */
-	VLayerHandle     *video_handle;
+	//VLayerHandle     *video_handle;
 	HTMLMediaElement *video_element; // XXX: we can have several media instances per browser but this one is the vlayer video element (there can be only one at once).
 	ULONG video_fullscreen;
 	ULONG video_mode;
@@ -509,7 +509,7 @@ DEFNEW
 		/* Passed attributes */
 		set(obj, MA_OWBBrowser_PrivateBrowsing, (ULONG) GetTagData(MA_OWBBrowser_PrivateBrowsing, FALSE, msg->ops_AttrList));
 
-		//kprintf("OWBBrowser: loading url <%s> is_frame: %d sourceview %p\n", data->url, data->is_frame, data->source_view);
+		//D(bug("OWBBrowser: loading url <%s> is_frame: %d sourceview %p\n", data->url, data->is_frame, data->source_view));
 
 		if(data->source_view)
 		{
@@ -1431,7 +1431,7 @@ DEFMMETHOD(Show)
 
 	rc = DOSUPER;
 
-	D(kprintf("[OWBBrowser] Show: %p size: %dx%d at (%d,%d) for widget %p\n", obj, _mwidth(obj), _mheight(obj), _mleft(obj), _mtop(obj), data->view));
+	D(bug("[OWBBrowser] Show: %p size: %dx%d at (%d,%d) for widget %p\n", obj, _mwidth(obj), _mheight(obj), _mleft(obj), _mtop(obj), data->view));
 
 	ULONG oldwidth = data->width;
 	ULONG oldheight = data->height;
@@ -1466,7 +1466,7 @@ DEFMMETHOD(Show)
 	// Window size changed
 	if(oldwidth != data->width || oldheight != data->height)
 	{
-		D(kprintf("[OWBBrowser] Resizing\n"));
+		D(bug("[OWBBrowser] Resizing\n"));
 
 #if USE_MORPHOS_SURFACE
 		struct Window *window = (struct Window *) getv(data->view->window, MUIA_Window);
@@ -1517,7 +1517,7 @@ DEFMMETHOD(Show)
 #endif
 			{
 				IntSize size = data->video_element->player()->naturalSize();
-				//kprintf("naturalsize %dx%d\n", size.width(), size.height());
+				//D(bug("naturalsize %dx%d\n", size.width(), size.height()));
 
 				if ( ( (float) size.width() / (float) size.height()) < ( (float) _mwidth(obj) / (float) _mheight(obj)) )
 				{
@@ -1669,11 +1669,11 @@ DEFSMETHOD(OWBBrowser_Update)
 
 		if(src && data->rp_offscreen.BitMap)
 		{
-			WritePixelArray(src, data->update_x, data->update_y, stride, &data->rp_offscreen, data->update_x, data->update_y, data->update_width, data->update_height, RECTFMT_ARGB);
+			WritePixelArray(src, data->update_x, data->update_y, stride, PIXF_A8R8G8B8, &data->rp_offscreen, data->update_x, data->update_y, data->update_width, data->update_height);
 		}
 	}
 
-	//kprintf("[update] %f ms\n", (currentTime() - start)*1000);
+	//D(bug("[update] %f ms\n", (currentTime() - start)*1000));
 
 	return 0;
 }
@@ -1699,7 +1699,7 @@ DEFSMETHOD(OWBBrowser_Scroll)
 
     data->pendingscrollrect = data->scrollrect;
 
-	//kprintf("[scroll] %f ms\n", (currentTime() - start)*1000);
+	//D(bug("[scroll] %f ms\n", (currentTime() - start)*1000));
 
 	return 0;
 }
@@ -1718,7 +1718,7 @@ DEFMMETHOD(Draw)
 
 	if (msg->flags & MADF_DRAWUPDATE)
 	{
-		D(kprintf("[OWBBrowser] Drawupdate\n"));
+		D(bug("[OWBBrowser] Drawupdate\n"));
 
 		if(data->draw_mode == DRAW_UPDATE)
 		{
@@ -1752,7 +1752,7 @@ DEFMMETHOD(Draw)
 			stride = data->plugin_stride;
 			src	= data->plugin_src;
 
-			D(kprintf("draw plugin: %dx%d at (%d, %d) src 0x%p stride %lu\n", data->update_width, data->update_height, data->update_x, data->update_y, src, stride));
+			D(bug("draw plugin: %dx%d at (%d, %d) src 0x%p stride %lu\n", data->update_width, data->update_height, data->update_x, data->update_y, src, stride));
 
 #if USE_MORPHOS_SURFACE
 			// XXX: implement
@@ -1760,7 +1760,6 @@ DEFMMETHOD(Draw)
 			if(src && data->rp_offscreen.BitMap)
 			{
 				WritePixelArrayAlpha(src, data->plugin_update_x, data->plugin_update_y, stride, &data->rp_offscreen, data->update_x, data->update_y, data->update_width, data->update_height, 0xffffffff);
-				//WritePixelArray(src, data->plugin_update_x, data->plugin_update_y, stride, &data->rp_offscreen, data->update_x, data->update_y, data->update_width, data->update_height, RECTFMT_ARGB);
 				BltBitMapRastPort(data->rp_offscreen.BitMap, data->update_x, data->update_y, _rp(obj), _mleft(obj) + data->update_x, _mtop(obj) + data->update_y, data->update_width, data->update_height, 0xC0);
 			}
 #endif
@@ -1772,7 +1771,7 @@ DEFMMETHOD(Draw)
 	}
 	else if(msg->flags & MADF_DRAWOBJECT)
 	{
-		D(kprintf("[OWBBrowser] Drawobject\n"));
+		D(bug("[OWBBrowser] Drawobject\n"));
 
 #if USE_MORPHOS_SURFACE
 		BltBitMapRastPort(cairo_morphos_surface_get_bitmap(data->view->surface), 0, 0, _rp(obj), _mleft(obj), _mtop(obj), _mwidth(obj), _mheight(obj), 0xCC);
@@ -1795,7 +1794,7 @@ DEFMMETHOD(Draw)
 
 				if(src)
 				{
-					WritePixelArray(src, 0, 0, stride, &data->rp_offscreen, 0, 0, data->width, data->height, RECTFMT_ARGB);
+					WritePixelArray(src, 0, 0, stride, PIXF_A8R8G8B8, &data->rp_offscreen, 0, 0, data->width, data->height);
 				}
 
 				data->dirty = FALSE;
@@ -2512,7 +2511,7 @@ DEFMMETHOD(GoActive)
 {
 	/*
 	GETDATA;
-	kprintf("GoActive\n");
+	D(bug("GoActive\n"));
 	data->is_active = TRUE;
 	data->view->webView->updateFocusedAndActiveState();
 	_flags(obj) &= ~MADF_KNOWSACTIVE;
@@ -2524,7 +2523,7 @@ DEFMMETHOD(GoInactive)
 {
 	/*
 	GETDATA;
-	kprintf("GoInactive\n");
+	D(bug("GoInactive\n"));
 	data->is_active = FALSE;
 	data->view->webView->updateFocusedAndActiveState();
 	*/
@@ -2536,7 +2535,7 @@ DEFTMETHOD(OWBBrowser_FocusChanged)
 	/*
 	GETDATA;
 	data->is_active = ((Object *) getv(_win(obj), MUIA_Window_ActiveObject)) == obj;
-	kprintf("FocusChanged: activeobject %d\n", ((Object *) getv(_win(obj), MUIA_Window_ActiveObject)) == obj);
+	D(bug("FocusChanged: activeobject %d\n", ((Object *) getv(_win(obj), MUIA_Window_ActiveObject)) == obj));
 	*/
 
 	return 0;
@@ -3283,7 +3282,7 @@ static void fix_scanline(struct RastPort *rp, int y, int width, int minalpha)
 	unsigned char buff[width * 4]; /* this will never be bigger than DRAGSIZE * 4 */
 	int i;
 
-	ReadPixelArray(buff, 0, 0, 0, rp, 0, y, width, 1, RECTFMT_RGBA);
+	ReadPixelArray(rp, 0, y, buff, 0, 0, 0, PIXF_A8R8G8B8, width, 1);
 
 	for(i=0; i<width; i++)
 	{
@@ -3293,7 +3292,7 @@ static void fix_scanline(struct RastPort *rp, int y, int width, int minalpha)
 		buff[i * 4 + 3] = a;
 	}
 
-	WritePixelArray(buff, 0, 0, 0, rp, 0, y, width, 1, RECTFMT_RGBA);
+	WritePixelArray(buff, 0, 0, 0, PIXF_A8R8G8B8, rp, 0, y, width, 1);
 }
 
 DEFMMETHOD(CreateDragImage)
@@ -3342,7 +3341,7 @@ DEFMMETHOD(CreateDragImage)
 
 			InitRastPort(&rp);
 			rp.BitMap = di->bm;
-			WritePixelArray(src, 0,0, stride, &rp, 0, 0, width, height, RECTFMT_ARGB);
+			WritePixelArray(src, 0,0, stride, PIXF_A8R8G8B8, &rp, 0, 0, width, height);
 		}
 		// Else, generate some text (XXX: consider more relevant data using MA_OWBBrowser_DragData)
 #if 0
@@ -3514,7 +3513,7 @@ DEFMMETHOD(DragQuery)
 {
 	GETDATA;
 
-	D(kprintf("DragQuery from %p for %p\n", msg->obj, obj));
+	D(bug("DragQuery from %p for %p\n", msg->obj, obj));
 
 	LONG type = getv(msg->obj, MA_OWB_ObjectType);
 
@@ -3523,7 +3522,7 @@ DEFMMETHOD(DragQuery)
 	{
 		if(type == MV_OWB_ObjectType_Browser)
 		{
-			D(kprintf("Source object is a browser dataObject %p\n", dataObject));
+			D(bug("Source object is a browser dataObject %p\n", dataObject));
 			if(obj != msg->obj)
 			{
 				dataObject = (APTR) getv(msg->obj, MA_OWBBrowser_DragData);
@@ -3544,13 +3543,13 @@ DEFMMETHOD(DragBegin)
 {
 	GETDATA;
 
-	D(kprintf("DragBegin (%d %d)\n", data->last_position.x(), data->last_position.y()));
+	D(bug("DragBegin (%d %d)\n", data->last_position.x(), data->last_position.y()));
 
 	if(dataObject)
 	{
 		IntPoint position(data->last_position);
 		DragData dragData((DataObjectMorphOS *) dataObject, position, position, (DragOperation) data->dragoperation);
-		D(kprintf("dragEntered\n"));
+		D(bug("dragEntered\n"));
 		/*DragOperation operation = */core(data->view->webView)->dragController().dragEntered(&dragData);
 	}
 
@@ -3561,7 +3560,7 @@ DEFMMETHOD(DragReport)
 {
 	GETDATA;
 
-	//D(kprintf("DragReport (%d %d)\n", msg->x - _mleft(obj), msg->y - _mtop(obj)));
+	//D(bug("DragReport (%d %d)\n", msg->x - _mleft(obj), msg->y - _mtop(obj)));
 
 	if(!msg->update)
 	{
@@ -3573,7 +3572,7 @@ DEFMMETHOD(DragReport)
 		IntPoint position(msg->x - _mleft(obj), msg->y - _mtop(obj));
 		data->last_drag_position = position;
 		DragData dragData((DataObjectMorphOS *) dataObject, position, position, (DragOperation) data->dragoperation);
-		//D(kprintf("dragUpdated\n"));
+		//D(bug("dragUpdated\n"));
 		/*DragOperation operation = */core(data->view->webView)->dragController().dragUpdated(&dragData);
 	}
 
@@ -3584,7 +3583,7 @@ DEFMMETHOD(DragFinish)
 {
 	GETDATA;
 
-	D(kprintf("DragFinish (%d %d) dropfollows %d\n", data->last_drag_position.x(), data->last_drag_position.y(), msg->dropfollows));
+	D(bug("DragFinish (%d %d) dropfollows %d\n", data->last_drag_position.x(), data->last_drag_position.y(), msg->dropfollows));
 
 	if(dataObject)
 	{
@@ -3593,7 +3592,7 @@ DEFMMETHOD(DragFinish)
 		{
 			IntPoint position(data->last_drag_position);
 			DragData dragData((DataObjectMorphOS *) dataObject, position, position, (DragOperation) data->dragoperation);
-			D(kprintf("dragExited\n"));
+			D(bug("dragExited\n"));
 			core(data->view->webView)->dragController().dragExited(&dragData);
 		}
 
@@ -3607,7 +3606,7 @@ DEFMMETHOD(DragDrop)
 {
 	GETDATA;
 
-	D(kprintf("DragDrop drop (%d %d) last_drag_position (%d %d)\n", msg->x - _mleft(obj), msg->y - _mtop(obj), data->last_drag_position.x(), data->last_drag_position.y())); // Wrong pos, why?
+	D(bug("DragDrop drop (%d %d) last_drag_position (%d %d)\n", msg->x - _mleft(obj), msg->y - _mtop(obj), data->last_drag_position.x(), data->last_drag_position.y())); // Wrong pos, why?
 
 	if(dataObject)
 	{
@@ -3625,16 +3624,16 @@ DEFMMETHOD(DragDrop)
 			event.Code  = IECODE_LBUTTON | IECODE_UP_PREFIX;
 
 			PlatformMouseEvent pevent = PlatformMouseEvent(&event);
-			D(kprintf("dragSourceEndedAt(%d %d)\n", position.x(), position.y()));
+			D(bug("dragSourceEndedAt(%d %d)\n", position.x(), position.y()));
 			frame->eventHandler().dragSourceEndedAt(pevent, (DragOperation) data->dragoperation);
 		}
 
 		// Perform the drag
 		data->last_drag_position = position;
 		DragData dragData((DataObjectMorphOS *) dataObject, position, position, (DragOperation) data->dragoperation);
-		D(kprintf("performDrag\n"));
+		D(bug("performDrag\n"));
 		core(data->view->webView)->dragController().performDrag(&dragData);
-		//D(kprintf("dragEnded\n"));
+		//D(bug("dragEnded\n"));
 		//core(data->view->webView)->dragController()->dragEnded();
 		//dataObject = 0;
 	}
@@ -3787,7 +3786,7 @@ DEFMMETHOD(Backfill)
 	struct Rectangle b1, b2, k;
 	struct Rectangle bounds = { left, top, right, bottom };
 
-//	  kprintf("backfill %d %d %d %d x_offset %d y_offset %d\n", left, top, right, bottom, mygui->x_offset, mygui->y_offset);
+//	  D(bug("backfill %d %d %d %d x_offset %d y_offset %d\n", left, top, right, bottom, mygui->x_offset, mygui->y_offset));
 
 
 	/* key rect */
@@ -3847,29 +3846,28 @@ DEFMMETHOD(Backfill)
 	{
 		if (IsValidRect(&b1))
 		{
-			FillPixelArray(_rp(obj), b1.MinX, b1.MinY,
-			               b1.MaxX - b1.MinX + 1, b1.MaxY - b1.MinY + 1,
-			               0x00000000);
+			RectFillColor(_rp(obj), b1.MinX, b1.MinY,
+							b1.MaxX - b1.MinX + 1, b1.MaxY - b1.MinY + 1,
+							0x00000000);
 		}
 
 		if (IsValidRect(&b2))
 		{
-			FillPixelArray(_rp(obj), b2.MinX, b2.MinY,
-			               b2.MaxX - b2.MinX + 1, b2.MaxY - b2.MinY + 1,
-			               0x00000000);
+			RectFillColor(_rp(obj), b2.MinX, b2.MinY,
+							b2.MaxX - b2.MinX + 1, b2.MaxY - b2.MinY + 1,
+							0x00000000);
 		}
 	}
 
 	if (IsValidRect(&k))
 	{
-
 #ifndef __amigaos4__
 			FillPixelArray(_rp(obj), k.MinX, k.MinY,
 					k.MaxX - k.MinX + 1, k.MaxY - k.MinY + 1,
 					data->video_colorkey);
 #else					
 					
-			 FillPixelArray(_rp(obj), data->rect.MinX, data->rect.MinY,
+			FillPixelArray(_rp(obj), data->rect.MinX, data->rect.MinY,
 		               data->rect.MaxX - data->rect.MinX + 1, data->rect.MaxY - data->rect.MinY + 1,
 						0x00000000); // we don't need color key for compositing
 						
@@ -3884,36 +3882,6 @@ DEFMMETHOD(Backfill)
 	return (TRUE);
 }
 
-/*
-DEFSMETHOD(OWBBrowser_VideoEnterFullWindow)
-{
-	GETDATA;
-
-	if(msg->enable)
-	{
-		struct Window *window = (struct Window *) getv(_win(obj), MUIA_Window);
-
-		if(window)
-		{
-#ifndef __amigaos4__
-		SetVLayerAttrTags(data->video_handle,
-				   VOA_LeftIndent,   window->BorderLeft + data->video_x_offset,
-				   VOA_RightIndent,  window->Width - window->BorderRight - 1 + data->video_x_offset,
-			  	   VOA_TopIndent,    window->BorderTop + data->video_y_offset,
-				   VOA_BottomIndent, window->Height - window->BorderBottom -1 + data->video_y_offset,
-				   TAG_DONE);
-#endif
-		}
-	}
-	else
-	{
-	
-	}
-
-	return 0;
-}
-*/
-
 DEFSMETHOD(OWBBrowser_VideoEnterFullPage)
 {
 	GETDATA;
@@ -3921,7 +3889,6 @@ DEFSMETHOD(OWBBrowser_VideoEnterFullPage)
 #ifdef __amigaos4__
 	 data->compositing =1;
 #endif
-
 
 	Element *e = (Element *) msg->element;
 	HTMLMediaElement *element = (HTMLMediaElement *) msg->element;
@@ -3943,7 +3910,7 @@ DEFSMETHOD(OWBBrowser_VideoEnterFullPage)
 			if(window)
 			{
 				IntSize size = element->player()->naturalSize();
-				//kprintf("naturalsize %dx%d\n", size.width(), size.height());
+				//D(bug("naturalsize %dx%d\n", size.width(), size.height()));
 
 				ULONG vlayer_width  = size.width() & -8;
 				ULONG vlayer_height = size.height() & -2;
@@ -3984,7 +3951,6 @@ DEFSMETHOD(OWBBrowser_VideoEnterFullPage)
 						BMATags_Displayable, TRUE,
 						BMATags_PixelFormat,PIXF_YUV422,
 						TAG_DONE);
-
 				}
 #else
 				if(!data->video_handle)
@@ -4116,19 +4082,19 @@ DEFSMETHOD(OWBBrowser_VideoEnterFullPage)
 
 		// Destroy vlayer
 #ifdef __amigaos4__
-						if(data->srcbm)
-						{
-							 FreeBitMap(data->srcbm);
-							data->srcbm = NULL;
-						}
-						if(data->dstbm)
-						{
-							FreeBitMap(data->dstbm);
-							data->dstbm = NULL;
-						}
+		if(data->srcbm)
+		{
+			FreeBitMap(data->srcbm);
+			data->srcbm = NULL;
+		}
+		if(data->dstbm)
+		{
+			FreeBitMap(data->dstbm);
+			data->dstbm = NULL;
+		}
 #else
-						DeleteVLayerHandle(data->video_handle);
-						data->video_handle = NULL;
+		DeleteVLayerHandle(data->video_handle);
+		data->video_handle = NULL;
 #endif
 #ifdef __amigaos4__
 		if(data->compositing ==1)
@@ -4156,7 +4122,7 @@ DEFSMETHOD(OWBBrowser_VideoEnterFullPage)
 			}
 #endif
 		}
-
+#endif
 		// Redraw the page
 		data->view->webView->addToDirtyRegion(IntRect(0, 0, data->width, data->height));
 		data->dirty = TRUE;
@@ -4167,7 +4133,6 @@ DEFSMETHOD(OWBBrowser_VideoEnterFullPage)
 
 	return 0;
 }
-
 
 DEFSMETHOD(OWBBrowser_VideoBlit)
 #ifdef __amigaos4__
@@ -4327,8 +4292,8 @@ DEFSMETHOD(OWBBrowser_VideoBlit)
 {
 	GETDATA;
 
-	//kprintf("blitoverlay %d %d %d\n", msg->width, msg->height, msg->linesize);
-
+	//D(bug("blitoverlay %d %d %d\n", msg->width, msg->height, msg->linesize));
+#ifndef __amigaos4__
 	if(data->video_handle && msg->src && msg->stride && LockVLayer(data->video_handle))
 	{
 		int w = msg->width & -8;
@@ -4429,9 +4394,9 @@ DEFSMETHOD(OWBBrowser_VideoBlit)
 		}
 
 		UnlockVLayer(data->video_handle);
-        SwapVLayerBuffer(data->video_handle);
+		SwapVLayerBuffer(data->video_handle);
 	}
-
+#endif
 	return 0;
 }
 #endif
@@ -4461,7 +4426,7 @@ DEFSMETHOD(Plugin_RenderRastPort)
 		PluginRect *nprect = (PluginRect *) msg->rect;
 		IntRect rect(nprect->x + npwindowrect->x, nprect->y + npwindowrect->y, nprect->width, nprect->height);
 
-		D(kprintf("RenderRastPort rect [%d, %d, %d, %d] windowrect [%d, %d, %d, %d] src 0x%p stride %lu\n",
+		D(bug("RenderRastPort rect [%d, %d, %d, %d] windowrect [%d, %d, %d, %d] src 0x%p stride %lu\n",
 				 nprect->x, nprect->y, nprect->width, nprect->height,
 				 npwindowrect->x, npwindowrect->y, npwindowrect->width, npwindowrect->height,
 				 msg->src, msg->stride));
@@ -4478,7 +4443,7 @@ DEFSMETHOD(Plugin_RenderRastPort)
 		PluginRect *npwindowrect = (PluginRect *) msg->windowrect;
 		IntRect windowrect(npwindowrect->x, npwindowrect->y, npwindowrect->width, npwindowrect->height);
 
-		D(kprintf("RenderRastPort rect [%d, %d, %d, %d] windowrect [%d, %d, %d, %d] src 0x%p stride %lu\n",
+		D(bug("RenderRastPort rect [%d, %d, %d, %d] windowrect [%d, %d, %d, %d] src 0x%p stride %lu\n",
 				 nprect->x, nprect->y, nprect->width, nprect->height,
 				 npwindowrect->x, npwindowrect->y, npwindowrect->width, npwindowrect->height,
 				 msg->src, msg->stride));
@@ -4580,7 +4545,7 @@ DEFTMETHOD(Plugin_IsBrowserActive)
 {
 	ULONG ret = FALSE;
 
-	D(kprintf("IsBrowserActive\n"));
+	D(bug("IsBrowserActive\n"));
 
 	if(muiRenderInfo(obj) && _win(obj) && getv(app, MA_OWBApp_ShouldAnimate))
 	{
@@ -4598,7 +4563,7 @@ DEFSMETHOD(Plugin_AddIDCMPHandler)
 	GETDATA;
 	struct EventHandlerNode *n;
 
-	D(kprintf("Plugin_AddIDCMPHandler %p %p\n", msg->instance, msg->handlerfunc));
+	D(bug("Plugin_AddIDCMPHandler %p %p\n", msg->instance, msg->handlerfunc));
 
 	n = (struct EventHandlerNode *) malloc(sizeof(*n));
 
@@ -4618,7 +4583,7 @@ DEFSMETHOD(Plugin_RemoveIDCMPHandler)
 	GETDATA;
 	APTR n, m;
 
-	D(kprintf("Plugin_RemoveIDCMPHandler %p\n", msg->instance));
+	D(bug("Plugin_RemoveIDCMPHandler %p\n", msg->instance));
 
 	ITERATELISTSAFE(n, m, &data->eventhandlerlist)
 	{

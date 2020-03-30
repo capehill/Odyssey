@@ -39,20 +39,24 @@
 
 #define SYSTEM_PRIVATE 1
 
-#include <cybergraphx/cybergraphics.h>
 #include <proto/alib.h>
-#include <proto/cybergraphics.h>
 #include <proto/utility.h>
-#include <clib/debug_protos.h>
+#include <proto/graphics.h>
 
 #include "gui.h"
-
-#define D(x)
 
 #define FAVICON_WIDTH 16
 #define FAVICON_HEIGHT 16
 
 #define FACTOR (data->scalefactor + 1)
+
+/* Debug output to serial handled via D(bug("....."));
+*  See Base/debug.h for details.
+*  D(x)    - to disable debug
+*  D(x) x  - to enable debug
+*/
+#define D(x)
+
 
 using namespace WebCore;
 
@@ -93,7 +97,7 @@ STATIC VOID doset(struct Data *data, APTR obj, struct TagItem *taglist)
 
 			case MA_FavIcon_NeedRedraw:
 			{
-				D(kprintf("Setting MA_FavIcon_NeedRedraw for <%s>\n", data->url, tag_data));
+				D(bug("Setting MA_FavIcon_NeedRedraw for <%s>\n", data->url, tag_data));
 				data->need_redraw = tag_data;
 			}
 			break;

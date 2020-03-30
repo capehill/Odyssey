@@ -39,14 +39,17 @@
 
 #define SYSTEM_PRIVATE 1
 
-#include <cybergraphx/cybergraphics.h>
 #include <proto/alib.h>
-#include <proto/cybergraphics.h>
 #include <proto/utility.h>
-#include <clib/debug_protos.h>
+#include <proto/graphics.h>
 
 #include "gui.h"
 
+/* Debug output to serial handled via D(bug("....."));
+*  See Base/debug.h for details.
+*  D(x)    - to disable debug
+*  D(x) x  - to enable debug
+*/
 #define D(x)
 
 #define ICON_WIDTH 22
