@@ -3844,16 +3844,12 @@ DEFMMETHOD(Backfill)
 	{
 		if (IsValidRect(&b1))
 		{
-			RectFillColor(_rp(obj), b1.MinX, b1.MinY,
-							b1.MaxX - b1.MinX + 1, b1.MaxY - b1.MinY + 1,
-							0x00000000);
+			RectFillColor(_rp(obj), b1.MinX, b1.MinY, b1.MaxX, b1.MaxY, 0xFF000000);
 		}
 
 		if (IsValidRect(&b2))
 		{
-			RectFillColor(_rp(obj), b2.MinX, b2.MinY,
-							b2.MaxX - b2.MinX + 1, b2.MaxY - b2.MinY + 1,
-							0x00000000);
+			RectFillColor(_rp(obj), b2.MinX, b2.MinY, b2.MaxX, b2.MaxY, 0xFF000000);
 		}
 	}
 
@@ -3865,11 +3861,9 @@ DEFMMETHOD(Backfill)
 					data->video_colorkey);
 #else					
 					
-			RectFillColor(_rp(obj), data->rect.MinX, data->rect.MinY,
-		               data->rect.MaxX - data->rect.MinX + 1, data->rect.MaxY - data->rect.MinY + 1,
-						0x00000000); // we don't need color key for compositing
+			RectFillColor(_rp(obj), data->rect.MinX, data->rect.MinY, data->rect.MaxX, data->rect.MaxY, 0xFF000000);
 						
-			//printf("after FillPixelArray k.MinX = %d, k.MinY = %d, k.MaxY = %d, k.MaxX = %d\n", k.MinX, k.MinY,k.MaxY, k.MaxX);
+			//D(bug("after FillPixelArray k.MinX = %d, k.MinY = %d, k.MaxY = %d, k.MaxX = %d\n", k.MinX, k.MinY,k.MaxY, k.MaxX));
 
 			data->vleft = k.MinX;
 			data->vright = k.MaxX - k.MinX + 1;
