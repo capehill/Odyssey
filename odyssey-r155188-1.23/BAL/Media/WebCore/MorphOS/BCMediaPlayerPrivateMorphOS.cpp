@@ -1775,6 +1775,8 @@ static bool openAhiDevice(_Stream *stream)
 		return false;
 	}
 
+	stream->volume = 1.0f;
+
 	stream->opened = TRUE;
 	return true;
 }
