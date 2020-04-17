@@ -3778,23 +3778,19 @@ DEFMMETHOD(Backfill)
 	{
 		if (IsValidRect(&b1))
 		{
-			RectFillColor(_rp(obj), b1.MinX, b1.MinY,
-							b1.MaxX + 1, b1.MaxY + 1,
-							0xFF000000);
+			RectFillColor(_rp(obj), b1.MinX, b1.MinY, b1.MaxX, b1.MaxY, 0xFF000000);
 		}
 
 		if (IsValidRect(&b2))
 		{
-			RectFillColor(_rp(obj), b2.MinX, b2.MinY,
-							b2.MaxX + 1, b2.MaxY + 1,
-							0xFF000000);
+			RectFillColor(_rp(obj), b2.MinX, b2.MinY, b2.MaxX, b2.MaxY, 0xFF000000);
 		}
 	}
 
 	if (IsValidRect(&data->rect))
 	{
 			RectFillColor(_rp(obj), data->rect.MinX, data->rect.MinY,
-						data->rect.MaxX + 1, data->rect.MaxY + 1,
+						data->rect.MaxX, data->rect.MaxY,
 						0xFF000000); // we don't need color key for compositing
 						
 			//printf("after FillPixelArray k.MinX = %d, k.MinY = %d, k.MaxY = %d, k.MaxX = %d\n", k.MinX, k.MinY,k.MaxY, k.MaxX);
