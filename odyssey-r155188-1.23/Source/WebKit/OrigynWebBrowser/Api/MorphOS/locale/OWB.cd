@@ -1841,7 +1841,7 @@ MSG_PREFSWINDOW_MEDIA_ENABLE_PARTIAL_CONTENT (//)
 _Fast seeking
 ;
 MSG_PREFSWINDOW_MEDIA_USE_WEBM (//)
-_WebM (VP8) support
+_WebM (VP8,VP9) support
 ;
 MSG_PREFSWINDOW_MEDIA_USE_FLV (//)
 FL_V (H.263/H.264) support
@@ -1990,4 +1990,11 @@ Do you want to interrupt processing of the current script?
 ;
 MSG_WEBVIEW_JSACTION_TITLE (//)
 Javascript Alert
+;
+;
+; Additional strings since 1.23
+;
+;
+MSG_PREFSWINDOW_MEDIA_USE_MP4 (//)
+_MP4 (H.264) support
 ;
